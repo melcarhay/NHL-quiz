@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NHL FACE-OFF</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root { --ice:#e8f4f8; --deep:#0a1628; --navy:#132547; --blue:#1a4a8a;
+    --red:#c8102e; --gold:#f4c430; --silver:#a8b8c8;
+    --correct:#2ecc71; --wrong:#e74c3c; --glass:rgba(255,255,255,0.07); }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Barlow',sans-serif; background:var(--deep); color:var(--ice); min-height:100vh; }
+  body::before { content:''; position:fixed; inset:0;
+    background:radial-gradient(ellipse 70% 50% at 50% 100%,rgba(26,74,138,0.25) 0%,transparent 70%),
+      linear-gradient(180deg,#0a1628 0%,#0d1e3a 100%); pointer-events:none; z-index:0; }
+  #app { position:relative; z-index:1; max-width:860px; margin:0 auto; padding:0 16px 60px; }
+  header { text-align:center; padding:26px 0 16px; }
+  .logo { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:clamp(2.2rem,6vw,3.6rem);
+    letter-spacing:0.08em; text-transform:uppercase; color:white; line-height:1; }
+  .logo span { color:var(--gold); }
+  .tagline { font-family:'Barlow Condensed',sans-serif; font-size:0.85rem; letter-spacing:0.25em;
+    color:var(--silver); text-transform:uppercase; margin-top:6px; }
+  .score-bar { display:flex; align-items:center; justify-content:center; gap:24px;
+    background:var(--glass); border:1px solid rgba(255,255,255,0.1); border-radius:50px;
+    padding:10px 26px; margin:0 auto 16px; max-width:520px; backdrop-filter:blur(8px); flex-wrap:wrap; }
+  .score-item { display:flex; flex-direction:column; align-items:center; gap:2px; }
+  .score-num { font-family:'Barlow Condensed',sans-serif; font-size:1.5rem; font-weight:700; line-height:1; }
+  .score-num.green { color:var(--correct); } .score-num.red { color:var(--wrong); } .score-num.gold { color:var(--gold); }
+  .score-label { font-size:0.62rem; letter-spacing:0.12em; color:var(--silver); text-transform:uppercase; }
+  .score-divider { width:1px; height:30px; background:rgba(255,255,255,0.15); }
+  .controls { display:flex; flex-direction:column; gap:12px; margin-bottom:16px; align-items:center; }
+  .mode-tabs { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+  .mode-tab { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:0.82rem;
+    letter-spacing:0.1em; text-transform:uppercase; padding:8px 18px; border:2px solid rgba(255,255,255,0.2);
+    border-radius:4px; background:transparent; color:var(--silver); cursor:pointer; transition:all 0.2s; }
+  .mode-tab:hover { border-color:var(--gold); color:var(--gold); }
+  .mode-tab.active { background:var(--gold); border-color:var(--gold); color:var(--deep); }
+  .sub-controls { display:flex; gap:14px; justify-content:center; flex-wrap:wrap; align-items:center; }
+  .diff-row { display:flex; gap:6px; }
+  .diff-btn { font-family:'Barlow Condensed',sans-serif; font-size:0.72rem; letter-spacing:0.12em;
+    font-weight:700; text-transform:uppercase; padding:5px 14px; border-radius:3px; border:1px solid;
+    cursor:pointer; transition:all 0.2s; background:transparent; }
+  .diff-btn[data-diff="easy"] { border-color:var(--correct); color:var(--correct); }
+  .diff-btn[data-diff="easy"].active { background:var(--correct); color:var(--deep); }
+  .diff-btn[data-diff="hard"] { border-color:var(--wrong); color:var(--wrong); }
+  .diff-btn[data-diff="hard"].active { background:var(--wrong); color:white; }
+  .team-picker { position:relative; }
+  .team-picker-btn { font-family:'Barlow',sans-serif; font-size:0.85rem; padding:6px 14px;
+    background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.2); border-radius:6px;
+    color:white; cursor:pointer; outline:none; display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .team-picker-btn:hover { border-color:rgba(255,255,255,0.4); }
+  .picker-arrow { font-size:0.7rem; opacity:0.6; }
+  .team-picker-menu { display:none; position:absolute; top:calc(100% + 6px); left:50%;
+    transform:translateX(-50%); background:var(--navy); border:1px solid rgba(255,255,255,0.2);
+    border-radius:10px; padding:12px 6px; z-index:50; min-width:280px; max-height:420px;
+    overflow-y:auto; box-shadow:0 12px 40px rgba(0,0,0,0.6); }
+  .team-picker-menu.open { display:block; }
+  .team-picker-menu::-webkit-scrollbar { width:6px; }
+  .team-picker-menu::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:3px; }
+  .tp-actions { display:flex; gap:8px; padding:0 8px 10px; border-bottom:1px solid rgba(255,255,255,0.1); margin-bottom:8px; }
+  .tp-action { font-family:'Barlow Condensed',sans-serif; font-size:0.72rem; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--gold); cursor:pointer; background:none; border:none; padding:2px 0; }
+  .tp-action:hover { text-decoration:underline; }
+  .tp-item { display:flex; align-items:center; gap:10px; padding:5px 10px; border-radius:5px;
+    cursor:pointer; transition:background 0.15s; font-size:0.88rem; }
+  .tp-item:hover { background:rgba(255,255,255,0.07); }
+  .tp-check { width:18px; height:18px; border:2px solid rgba(255,255,255,0.3); border-radius:4px;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:all 0.15s;
+    font-size:0.75rem; color:transparent; }
+  .tp-item.selected .tp-check { background:var(--gold); border-color:var(--gold); color:var(--deep); }
+  .tp-name { color:var(--ice); }
+  .tp-count { font-size:0.75rem; color:var(--silver); margin-left:auto; }
+  .data-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:0.72rem;
+    letter-spacing:0.1em; text-transform:uppercase; padding:6px 14px; border-radius:6px;
+    border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.07); color:var(--silver);
+    cursor:pointer; transition:all 0.2s; }
+  .data-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .quiz-card { background:linear-gradient(145deg,rgba(255,255,255,0.07),rgba(255,255,255,0.03));
+    border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:28px;
+    backdrop-filter:blur(12px); box-shadow:0 20px 60px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.1); }
+  .photo-wrap { width:220px; height:220px; border-radius:12px; overflow:hidden;
+    border:3px solid rgba(255,255,255,0.15); background:var(--navy); flex-shrink:0; }
+  .photo-wrap img { width:100%; height:100%; object-fit:cover; object-position:top center;
+    display:block; opacity:0; transition:opacity 0.4s; }
+  .photo-fallback { width:100%; height:100%; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; background:linear-gradient(135deg,#132547,#1a4a8a); gap:8px; }
+  .jersey-num { font-family:'Barlow Condensed',sans-serif; font-size:3rem; font-weight:900;
+    color:rgba(255,255,255,0.25); line-height:1; }
+  .photo-side { flex:1; display:flex; flex-direction:column; gap:14px; padding-left:24px; }
+  @media(max-width:580px) {
+    .photo-row { flex-direction:column !important; align-items:center !important; }
+    .photo-side { padding-left:0; padding-top:16px; }
+    .photo-wrap { width:200px; height:200px; }
+  }
+  .hint-chips { display:flex; flex-wrap:wrap; gap:8px; }
+  .hint-chip { font-family:'Barlow Condensed',sans-serif; font-size:0.8rem; letter-spacing:0.1em;
+    text-transform:uppercase; padding:4px 14px; border-radius:3px; font-weight:600; }
+  .chip-pos { background:rgba(26,74,138,0.5); border:1px solid var(--blue); color:#7ab0e8; }
+  .chip-team { background:rgba(200,16,46,0.2); border:1px solid rgba(200,16,46,0.5); color:#f08090; }
+  .chip-hidden { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12);
+    color:rgba(255,255,255,0.3); cursor:pointer; transition:all 0.2s; }
+  .chip-hidden:hover { border-color:rgba(255,255,255,0.3); color:rgba(255,255,255,0.6); }
+  .chip-revealed { background:rgba(244,196,48,0.2); border:1px solid rgba(244,196,48,0.5); color:var(--gold); }
+  .hint-label { font-size:0.7rem; color:var(--silver); letter-spacing:0.1em; text-transform:uppercase; }
+  .q-label { font-family:'Barlow Condensed',sans-serif; font-size:0.95rem; letter-spacing:0.2em;
+    text-transform:uppercase; color:var(--silver); margin-bottom:6px; }
+  .q-name { font-family:'Barlow Condensed',sans-serif; font-size:clamp(1.3rem,3vw,1.8rem);
+    font-weight:700; color:white; margin-bottom:18px; line-height:1.2; }
+  .answer-area { display:flex; gap:10px; }
+  .answer-input { flex:1; background:rgba(255,255,255,0.07); border:2px solid rgba(255,255,255,0.15);
+    border-radius:8px; padding:12px 18px; font-family:'Barlow',sans-serif; font-size:1.1rem;
+    color:white; outline:none; transition:border-color 0.2s; }
+  .answer-input:focus { border-color:var(--gold); }
+  .answer-input.correct { border-color:var(--correct); background:rgba(46,204,113,0.1); }
+  .answer-input.wrong { border-color:var(--wrong); background:rgba(231,76,60,0.1); }
+  .submit-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:1rem;
+    letter-spacing:0.12em; text-transform:uppercase; padding:12px 24px; background:var(--gold);
+    color:var(--deep); border:none; border-radius:8px; cursor:pointer; transition:all 0.2s; }
+  .submit-btn:hover { background:#f8d44a; transform:translateY(-1px); }
+  .mc-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:4px; }
+  .mc-btn { font-family:'Barlow',sans-serif; font-size:0.95rem; font-weight:500; padding:12px 16px;
+    background:rgba(255,255,255,0.05); border:2px solid rgba(255,255,255,0.12); border-radius:8px;
+    color:white; cursor:pointer; text-align:left; transition:all 0.2s; }
+  .mc-btn:hover:not(:disabled) { background:rgba(255,255,255,0.1); border-color:rgba(255,255,255,0.3); }
+  .mc-btn.correct { background:rgba(46,204,113,0.15); border-color:var(--correct); color:var(--correct); }
+  .mc-btn.wrong { background:rgba(231,76,60,0.12); border-color:var(--wrong); color:#f08080; }
+  .mc-btn:disabled { cursor:default; }
+  .feedback { margin-top:16px; padding:14px 18px; border-radius:8px; font-family:'Barlow Condensed',sans-serif;
+    font-size:1.1rem; font-weight:600; display:none; align-items:center; gap:10px; }
+  .feedback.show { display:flex; }
+  .feedback.correct { background:rgba(46,204,113,0.15); border:1px solid rgba(46,204,113,0.4); color:var(--correct); }
+  .feedback.wrong { background:rgba(231,76,60,0.12); border:1px solid rgba(231,76,60,0.35); color:#f08080; }
+  .feedback-sub { font-size:0.85rem; color:var(--silver); margin-top:3px; }
+  .facts-panel { margin-top:14px; padding:16px 18px; border-radius:10px;
+    background:rgba(26,74,138,0.15); border:1px solid rgba(26,74,138,0.4); display:none; }
+  .facts-panel.show { display:block; animation:fadeUp 0.4s ease-out; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .facts-title { font-family:'Barlow Condensed',sans-serif; font-size:0.8rem; letter-spacing:0.18em;
+    text-transform:uppercase; color:var(--gold); margin-bottom:10px; }
+  .facts-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 18px; }
+  .fact-item { display:flex; flex-direction:column; gap:1px; }
+  .fact-label { font-size:0.66rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--silver); }
+  .fact-value { font-size:0.95rem; color:var(--ice); font-weight:500; }
+  .next-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:1rem;
+    letter-spacing:0.15em; text-transform:uppercase; padding:12px 32px; background:transparent;
+    color:white; border:2px solid rgba(255,255,255,0.3); border-radius:8px; cursor:pointer;
+    margin-top:14px; transition:all 0.2s; display:none; }
+  .next-btn.show { display:block; }
+  .next-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .skip-link { font-size:0.78rem; color:var(--silver); cursor:pointer; text-decoration:underline;
+    text-underline-offset:3px; display:inline-block; margin-top:10px; }
+  .skip-link:hover { color:white; }
+  .streak-badge { position:fixed; top:16px; right:16px; font-family:'Barlow Condensed',sans-serif;
+    font-weight:900; font-size:1.1rem; background:var(--red); color:white; padding:6px 14px;
+    border-radius:50px; box-shadow:0 4px 20px rgba(200,16,46,0.5); display:none; z-index:100;
+    transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1); }
+  .streak-badge.show { display:block; }
+  .streak-badge.pop { transform:scale(1.3); }
+  @keyframes flashCorrect { 0%{box-shadow:0 0 0 0 rgba(46,204,113,0.8)} 100%{box-shadow:0 0 0 30px rgba(46,204,113,0)} }
+  @keyframes flashWrong { 0%{box-shadow:0 0 0 0 rgba(231,76,60,0.8)} 100%{box-shadow:0 0 0 30px rgba(231,76,60,0)} }
+  .quiz-card.flash-correct { animation:flashCorrect 0.5s ease-out; }
+  .quiz-card.flash-wrong { animation:flashWrong 0.5s ease-out; }
+  .small-photo { width:140px; height:140px; border-radius:10px; overflow:hidden;
+    border:2px solid rgba(255,255,255,0.15); background:var(--navy); flex-shrink:0; }
+  .small-photo img { width:100%; height:100%; object-fit:cover; object-position:top center; }
+  .welcome { text-align:center; padding:40px 24px; }
+  .welcome-icon { font-size:3.5rem; margin-bottom:16px; }
+  .welcome h2 { font-family:'Barlow Condensed',sans-serif; font-size:1.6rem; letter-spacing:0.05em;
+    color:white; margin-bottom:12px; }
+  .welcome p { color:var(--silver); line-height:1.6; max-width:480px; margin:0 auto 10px; font-size:0.95rem; }
+  .welcome-btn { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:1.1rem;
+    letter-spacing:0.1em; text-transform:uppercase; padding:14px 36px; background:var(--gold);
+    color:var(--deep); border:none; border-radius:8px; cursor:pointer; margin-top:20px; }
+  .welcome-btn:hover { background:#f8d44a; }
+  .toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:var(--navy); border:1px solid rgba(255,255,255,0.2); color:var(--ice);
+    padding:12px 24px; border-radius:8px; font-family:'Barlow Condensed',sans-serif;
+    font-size:0.95rem; letter-spacing:0.05em; box-shadow:0 8px 30px rgba(0,0,0,0.5);
+    opacity:0; transition:all 0.3s; z-index:200; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .toast.success { border-color:var(--correct); }
+  .toast.error { border-color:var(--wrong); }
+</style>
+</head>
+<body>
+<div class="streak-badge" id="streakBadge">&#128293; <span id="streakNum">0</span></div>
+<div class="toast" id="toast"></div>
+<div id="app">
+  <header>
+    <div class="logo">NHL <span>FACE-OFF</span></div>
+    <div class="tagline">Test your player knowledge</div>
+  </header>
+  <div id="scoreBar" class="score-bar" style="display:none">
+    <div class="score-item"><div class="score-num green" id="scoreCorrect">0</div><div class="score-label">Correct</div></div>
+    <div class="score-divider"></div>
+    <div class="score-item"><div class="score-num red" id="scoreWrong">0</div><div class="score-label">Wrong</div></div>
+    <div class="score-divider"></div>
+    <div class="score-item"><div class="score-num gold" id="scorePct">&mdash;</div><div class="score-label">Accuracy</div></div>
+    <div class="score-divider"></div>
+    <div class="score-item"><div class="score-num gold" id="scoreStreak">0</div><div class="score-label">Best Streak</div></div>
+  </div>
+  <div id="controls" class="controls" style="display:none">
+    <div class="mode-tabs">
+      <button class="mode-tab active" onclick="setMode('photo')" id="tab-photo">&#128248; Name the Player</button>
+      <button class="mode-tab" onclick="setMode('number')" id="tab-number"># Jersey Number</button>
+      <button class="mode-tab" onclick="setMode('team')" id="tab-team">&#127954; Name the Team</button>
+    </div>
+    <div class="sub-controls">
+      <div class="diff-row">
+        <button class="diff-btn active" data-diff="easy" onclick="setDiff('easy')">Easy</button>
+        <button class="diff-btn" data-diff="hard" onclick="setDiff('hard')">Hard</button>
+      </div>
+      <div class="team-picker" id="teamPicker">
+        <button class="team-picker-btn" onclick="toggleTeamPicker()">
+          <span id="teamPickerLabel">All Teams</span> <span class="picker-arrow">&#9662;</span>
+        </button>
+        <div class="team-picker-menu" id="teamPickerMenu"></div>
+      </div>
+      <button class="data-btn" onclick="exportData()" title="Save your player data to a file">&#11015; Export</button>
+      <button class="data-btn" onclick="document.getElementById('importFile').click()" title="Load a player data file">&#11014; Import</button>
+      <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(event)">
+    </div>
+  </div>
+  <div id="quizArea">
+    <div class="welcome">
+      <div class="welcome-icon">&#127954;</div>
+      <h2>Welcome to NHL Face-Off</h2>
+      <p>To get started, load your player data file (the <strong>nhl_data.json</strong> created by the downloader).</p>
+      <p>Once loaded, it's remembered on this device &mdash; you won't need to import it again unless you clear your browser or switch devices.</p>
+      <button class="welcome-btn" onclick="document.getElementById('importFileWelcome').click()">&#11014; Import Data File</button>
+      <input type="file" id="importFileWelcome" accept="application/json,.json" style="display:none" onchange="importData(event)">
+    </div>
+  </div>
+</div>
+<script>
+let NHL_PLAYERS = [];
+let activePool = [];
+let state = { mode:'photo', difficulty:'easy', selectedTeams:null,
+  current:null, answered:false, correct:0, wrong:0, streak:0, bestStreak:0, queue:[] };
+
+const DB_NAME = 'nhl_faceoff';
+const DB_STORE = 'roster';
+const DB_KEY   = 'players_v2';
+
+// ---------- IndexedDB (handles large photo data) ----------
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(DB_STORE);
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+async function saveStored() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction(DB_STORE, 'readwrite');
+    tx.objectStore(DB_STORE).put(NHL_PLAYERS, DB_KEY);
+  } catch(e) { /* storage unavailable - app still works this session */ }
+}
+async function loadStored() {
+  try {
+    const db = await openDB();
+    return new Promise(resolve => {
+      const req = db.transaction(DB_STORE).objectStore(DB_STORE).get(DB_KEY);
+      req.onsuccess = e => {
+        const players = e.target.result;
+        if (players && players.length) { NHL_PLAYERS = players; resolve(true); }
+        else resolve(false);
+      };
+      req.onerror = () => resolve(false);
+    });
+  } catch(e) { return false; }
+}
+
+function loadData(players) {
+  NHL_PLAYERS = players;
+  initSelectedTeams();
+  saveStored();
+  document.getElementById('scoreBar').style.display = 'flex';
+  document.getElementById('controls').style.display = 'flex';
+  buildTeamPicker();
+  applyFilter();
+  nextQuestion();
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      let players = Array.isArray(data) ? data : (data.players || null);
+      if (!players || !players.length) { showToast('That file has no player data', 'error'); return; }
+      const ok = players.every(p => p && p.name && p.teamCode !== undefined);
+      if (!ok) { showToast("That file doesn't look like NHL data", 'error'); return; }
+      players = players.filter(p => p.facts && p.facts.draft && p.facts.draft !== 'Undrafted');
+      if (!players.length) { showToast('No drafted players found in that file', 'error'); return; }
+      loadData(players);
+      showToast('Loaded ' + players.length + ' players', 'success');
+    } catch(err) { showToast('Could not read that file - is it valid JSON?', 'error'); }
+  };
+  reader.onerror = () => showToast('Failed to read the file', 'error');
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function exportData() {
+  if (!NHL_PLAYERS.length) { showToast('Nothing to export yet', 'error'); return; }
+  const payload = { format:'nhl-faceoff-data', version:1, count:NHL_PLAYERS.length, players:NHL_PLAYERS };
+  const blob = new Blob([JSON.stringify(payload)], { type:'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'nhl_data.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Exported ' + NHL_PLAYERS.length + ' players', 'success');
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + (type||'');
+  setTimeout(() => { t.className = 'toast ' + (type||''); }, 2800);
+}
+
+// ---------- quiz engine ----------
+function shuffle(arr){const a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function resetQueue(){state.queue=shuffle([...Array(activePool.length).keys()]);}
+function applyFilter(){
+  if(!state.selectedTeams || state.selectedTeams.size===0)
+    activePool = [];
+  else
+    activePool = NHL_PLAYERS.filter(p=>state.selectedTeams.has(p.teamCode));
+  resetQueue();
+}
+function allTeamCodes(){ return [...new Set(NHL_PLAYERS.map(p=>p.teamCode))]; }
+function initSelectedTeams(){ state.selectedTeams = new Set(allTeamCodes()); }
+function setMode(m){state.mode=m;document.querySelectorAll('.mode-tab').forEach(t=>t.classList.remove('active'));document.getElementById('tab-'+m).classList.add('active');nextQuestion();}
+function setDiff(d){state.difficulty=d;document.querySelectorAll('.diff-btn').forEach(b=>b.classList.remove('active'));document.querySelector('.diff-btn[data-diff="'+d+'"]').classList.add('active');nextQuestion();}
+function nextQuestion(){state.answered=false;if(activePool.length===0)return;if(state.queue.length===0)resetQueue();state.current=activePool[state.queue.pop()];render();}
+
+function levenshtein(a,b){const m=a.length,n=b.length;const dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)dp[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);return dp[m][n];}
+function checkName(guess,player){const g=guess.trim().toLowerCase();if(!g)return{match:false};const full=player.name.toLowerCase(),first=player.firstName.toLowerCase(),last=player.lastName.toLowerCase();if(g===full||g===first||g===last)return{match:true,close:false};if(levenshtein(g,full)<=2)return{match:true,close:true};if(first.length>3&&levenshtein(g,first)<=1)return{match:true,close:true};const md=last.length<=5?1:2;if(levenshtein(g,last)<=md)return{match:true,close:true};return{match:false};}
+
+function esc(s){return s.replace(/'/g,"\\'").replace(/"/g,'&quot;');}
+function photoHtml(p,size){const cls=size==='large'?'photo-wrap':'small-photo';if(p.photo){return '<div class="'+cls+'"><img src="'+p.photo+'" alt="player" data-num="'+p.number+'" onload="this.style.opacity=1" onerror="photoFailed(this)"></div>';}return '<div class="'+cls+'"><div class="photo-fallback"><div class="jersey-num">#'+p.number+'</div></div></div>';}
+function photoFailed(img){const num=img.getAttribute('data-num');img.parentNode.innerHTML='<div class="photo-fallback"><div class="jersey-num">#'+num+'</div></div>';}
+
+function factsHtml(p){
+  const f = p.facts || {};
+  const order = [['draft','Drafted'],['debut','NHL Debut'],['born','Born'],['birthplace','Birthplace'],['height','Height'],['weight','Weight'],['shoots','Shoots/Catches'],['career','Career (reg. season)']];
+  const items = order.filter(([k])=>f[k]).map(([k,label])=>'<div class="fact-item"><div class="fact-label">'+label+'</div><div class="fact-value">'+f[k]+'</div></div>');
+  if(!items.length) return '';
+  return '<div class="facts-panel show"><div class="facts-title">&#128202; Player Facts</div><div class="facts-grid">'+items.join('')+'</div></div>';
+}
+
+function render(){
+  const p=state.current,mode=state.mode,easy=state.difficulty==='easy';
+  let html='<div class="quiz-card" id="quizCard">';
+  if(mode==='photo'){
+    html+='<div class="q-label">Who is this player?</div><div style="display:flex" class="photo-row">'+photoHtml(p,'large')+
+      '<div class="photo-side"><div><div class="hint-label">Position</div><div class="hint-chips"><span class="hint-chip chip-pos">'+p.pos+'</span></div></div>'+
+      '<div><div class="hint-label">Hints (tap to reveal)</div><div class="hint-chips">'+
+      '<span class="hint-chip chip-hidden" id="hintTeam" onclick="revealHint(\'team\')">&#127954; Team</span>'+
+      '<span class="hint-chip chip-hidden" id="hintNum" onclick="revealHint(\'num\')"># Number</span></div></div></div></div>';
+    if(easy){
+      const opts=shuffle([p,...shuffle(NHL_PLAYERS.filter(x=>x.name!==p.name)).slice(0,3)]);
+      html+='<div style="margin-top:20px"><div class="q-label">Select the correct player:</div><div class="mc-options">';
+      opts.forEach(o=>html+='<button class="mc-btn" onclick="checkMC(\''+esc(o.name)+'\',\''+esc(p.name)+'\')">'+o.name+'</button>');
+      html+='</div></div>';
+    } else {
+      html+='<div style="margin-top:20px"><div class="answer-area"><input class="answer-input" id="ansIn" placeholder="First or last name&hellip;" autocomplete="off" onkeydown="if(event.key===\'Enter\')submitText()"><button class="submit-btn" onclick="submitText()">Submit</button></div></div>';
+    }
+  } else if(mode==='number'){
+    html+='<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap" class="photo-row">'+photoHtml(p,'small')+
+      '<div style="flex:1;min-width:180px"><div class="q-label">What number does</div><div class="q-name">'+p.name+'</div>'+
+      '<div class="hint-chips" style="margin-bottom:12px"><span class="hint-chip chip-pos">'+p.pos+'</span>'+
+      '<span class="hint-chip chip-team" style="margin-left:4px">'+p.team+'</span></div><div class="q-label">wear?</div></div></div>';
+    if(easy){
+      const nums=shuffle(genNums(p.number));
+      html+='<div style="margin-top:20px"><div class="mc-options">';
+      nums.forEach(n=>html+='<button class="mc-btn" onclick="checkNum('+n+','+p.number+')">#'+n+'</button>');
+      html+='</div></div>';
+    } else {
+      html+='<div style="margin-top:20px"><div class="answer-area"><input class="answer-input" id="ansIn" placeholder="Number&hellip;" type="number" min="1" max="99" onkeydown="if(event.key===\'Enter\')submitNum('+p.number+')"><button class="submit-btn" onclick="submitNum('+p.number+')">Submit</button></div></div>';
+    }
+  } else if(mode==='team'){
+    const teams=[...new Set(NHL_PLAYERS.map(x=>x.team))];
+    const opts=shuffle([p.team,...shuffle(teams.filter(t=>t!==p.team)).slice(0,3)]);
+    html+='<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap" class="photo-row">'+photoHtml(p,'small')+
+      '<div style="flex:1;min-width:180px"><div class="q-label">What team does</div><div class="q-name">'+p.name+'</div>'+
+      '<div class="hint-chips" style="margin-bottom:12px"><span class="hint-chip chip-pos">'+p.pos+'</span>'+
+      '<span class="hint-chip chip-pos" style="margin-left:4px">#'+p.number+'</span></div><div class="q-label">play for?</div></div></div>'+
+      '<div style="margin-top:20px"><div class="mc-options">';
+    opts.forEach(t=>html+='<button class="mc-btn" onclick="checkTeam(\''+esc(t)+'\',\''+esc(p.team)+'\')">'+t+'</button>');
+    html+='</div></div>';
+  }
+  html+='<div class="feedback" id="feedback"><span id="fbIcon"></span><div><div id="fbText"></div><div class="feedback-sub" id="fbSub"></div></div></div>'+
+    '<div id="factsArea"></div>'+
+    '<button class="next-btn" id="nextBtn" onclick="nextQuestion()">Next Player &rarr;</button>'+
+    '<div><span class="skip-link" onclick="nextQuestion()">Skip</span></div></div>';
+  document.getElementById('quizArea').innerHTML=html;
+  const inp=document.getElementById('ansIn');if(inp)setTimeout(()=>inp.focus(),80);
+}
+
+function result(correct,close,extra){
+  state.answered=true;const p=state.current;
+  const card=document.getElementById('quizCard');const fb=document.getElementById('feedback');
+  if(correct){
+    state.correct++;state.streak++;if(state.streak>state.bestStreak)state.bestStreak=state.streak;
+    fb.className='feedback correct show';document.getElementById('fbIcon').textContent='\u2713';
+    document.getElementById('fbText').innerHTML='Correct! <strong>'+p.name+'</strong>'+(close?' <span style="font-size:.72rem;background:rgba(244,196,48,.2);border:1px solid #f4c430;color:#f4c430;padding:2px 8px;border-radius:3px;margin-left:6px">Close enough!</span>':'');
+    document.getElementById('fbSub').textContent=p.team+' \u00b7 #'+p.number+' \u00b7 '+p.pos;
+    card.classList.add('flash-correct');card.addEventListener('animationend',()=>card.classList.remove('flash-correct'),{once:true});
+  } else {
+    state.wrong++;state.streak=0;
+    fb.className='feedback wrong show';document.getElementById('fbIcon').textContent='\u2717';
+    document.getElementById('fbText').innerHTML='That\'s <strong>'+p.name+'</strong>';
+    document.getElementById('fbSub').textContent=p.team+' \u00b7 #'+p.number+(extra?' \u00b7 '+extra:'');
+    card.classList.add('flash-wrong');card.addEventListener('animationend',()=>card.classList.remove('flash-wrong'),{once:true});
+  }
+  // Show player facts after every answer
+  document.getElementById('factsArea').innerHTML = factsHtml(p);
+  document.getElementById('nextBtn').classList.add('show');updateScore();updateStreak();
+}
+function submitText(){if(state.answered)return;const inp=document.getElementById('ansIn');const r=checkName(inp.value,state.current);if(r.match){inp.classList.add('correct');result(true,r.close);}else{inp.classList.add('wrong');inp.disabled=true;result(false);}}
+function submitNum(correct){if(state.answered)return;const inp=document.getElementById('ansIn');const g=parseInt(inp.value);if(isNaN(g))return;if(g===correct){inp.classList.add('correct');result(true);}else{inp.classList.add('wrong');inp.disabled=true;result(false,false,"It's #"+correct);}}
+function checkMC(guess,correct){if(state.answered)return;document.querySelectorAll('.mc-btn').forEach(b=>{b.disabled=true;if(b.textContent===correct)b.classList.add('correct');else if(b.textContent===guess&&guess!==correct)b.classList.add('wrong');});result(guess===correct);}
+function checkNum(guess,correct){if(state.answered)return;document.querySelectorAll('.mc-btn').forEach(b=>{b.disabled=true;const n=parseInt(b.textContent.replace('#',''));if(n===correct)b.classList.add('correct');else if(n===guess&&guess!==correct)b.classList.add('wrong');});result(guess===correct);}
+function checkTeam(guess,correct){if(state.answered)return;document.querySelectorAll('.mc-btn').forEach(b=>{b.disabled=true;if(b.textContent===correct)b.classList.add('correct');else if(b.textContent===guess&&guess!==correct)b.classList.add('wrong');});result(guess===correct);}
+function revealHint(type){if(state.answered)return;const p=state.current;if(type==='team'){const el=document.getElementById('hintTeam');el.className='hint-chip chip-revealed';el.onclick=null;el.textContent='\uD83C\uDFD2 '+p.team;}else{const el=document.getElementById('hintNum');el.className='hint-chip chip-revealed';el.onclick=null;el.textContent='#'+p.number;}}
+function genNums(correct){const s=new Set([correct]);while(s.size<4){const n=Math.max(1,Math.min(99,correct+Math.floor(Math.random()*20)-10));s.add(n);}return[...s];}
+function updateScore(){document.getElementById('scoreCorrect').textContent=state.correct;document.getElementById('scoreWrong').textContent=state.wrong;document.getElementById('scoreStreak').textContent=state.bestStreak;const t=state.correct+state.wrong;document.getElementById('scorePct').textContent=t?Math.round(state.correct/t*100)+'%':'\u2014';}
+function updateStreak(){const b=document.getElementById('streakBadge');document.getElementById('streakNum').textContent=state.streak;if(state.streak>=3){b.classList.add('show','pop');setTimeout(()=>b.classList.remove('pop'),300);}else b.classList.remove('show');}
+
+function buildTeamPicker(){
+  if(!state.selectedTeams) initSelectedTeams();
+  const menu=document.getElementById('teamPickerMenu');
+  const teams=[...new Set(NHL_PLAYERS.map(p=>p.team))].sort();
+  let html='<div class="tp-actions"><button class="tp-action" onclick="tpSelectAll()">Select All</button><button class="tp-action" onclick="tpSelectNone()">Clear All</button></div>';
+  teams.forEach(name=>{
+    const code=NHL_PLAYERS.find(p=>p.team===name).teamCode;
+    const count=NHL_PLAYERS.filter(p=>p.teamCode===code).length;
+    const sel=state.selectedTeams.has(code)?'selected':'';
+    html+='<div class="tp-item '+sel+'" data-code="'+code+'" onclick="tpToggle(this,\''+code+'\')">'+
+      '<div class="tp-check">&#10003;</div><span class="tp-name">'+name+'</span><span class="tp-count">'+count+'</span></div>';
+  });
+  menu.innerHTML=html;
+  updatePickerLabel();
+}
+function toggleTeamPicker(){
+  const menu=document.getElementById('teamPickerMenu');
+  menu.classList.toggle('open');
+  if(menu.classList.contains('open')){
+    document.addEventListener('click',closePickerOutside);
+  }
+}
+function closePickerOutside(e){
+  const picker=document.getElementById('teamPicker');
+  if(!picker.contains(e.target)){
+    document.getElementById('teamPickerMenu').classList.remove('open');
+    document.removeEventListener('click',closePickerOutside);
+  }
+}
+function tpToggle(el,code){
+  if(state.selectedTeams.has(code)){
+    state.selectedTeams.delete(code);
+    el.classList.remove('selected');
+  } else {
+    state.selectedTeams.add(code);
+    el.classList.add('selected');
+  }
+  updatePickerLabel();
+  applyFilter();
+  if(activePool.length>0) nextQuestion();
+  else document.getElementById('quizArea').innerHTML='<div class="quiz-card" style="text-align:center;padding:40px"><div class="q-label">Pick at least one team to start</div></div>';
+}
+function tpSelectAll(){
+  initSelectedTeams();
+  document.querySelectorAll('.tp-item').forEach(el=>el.classList.add('selected'));
+  updatePickerLabel(); applyFilter(); nextQuestion();
+}
+function tpSelectNone(){
+  state.selectedTeams.clear();
+  document.querySelectorAll('.tp-item').forEach(el=>el.classList.remove('selected'));
+  updatePickerLabel();
+  activePool=[];
+  document.getElementById('quizArea').innerHTML='<div class="quiz-card" style="text-align:center;padding:40px"><div class="q-label">Pick at least one team to start</div></div>';
+}
+function updatePickerLabel(){
+  const label=document.getElementById('teamPickerLabel');
+  const n=state.selectedTeams.size;
+  const total=allTeamCodes().length;
+  if(n===total) label.textContent='All Teams ('+total+')';
+  else if(n===0) label.textContent='No Teams';
+  else if(n===1){
+    const code=[...state.selectedTeams][0];
+    const team=NHL_PLAYERS.find(p=>p.teamCode===code);
+    label.textContent=team?team.team:code;
+  } else label.textContent=n+' Teams Selected';
+}
+
+// ---------- startup ----------
+(async () => {
+  const had = await loadStored();
+  if (had) {
+    initSelectedTeams();
+    document.getElementById('scoreBar').style.display = 'flex';
+    document.getElementById('controls').style.display = 'flex';
+    buildTeamPicker();
+    applyFilter();
+    nextQuestion();
+  }
+})();
+</script>
+</body>
+</html>
